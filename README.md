@@ -1,4 +1,4 @@
-# CausalFakeNet — FYP Prototype
+# CausalFakeNet/EventX-FND — FYP Prototype
 
 **Event-driven multimodal fake news detection with causal graphs and explainability.**
 
