@@ -1,15 +1,3 @@
-# ════════════════════════════════════════════════════════════════
-# SESSION 1 — Run this notebook ONCE only
-#
-# What it does:
-#   - Loads Pheme dataset from Google Drive
-#   - Extracts CLIP features for all news items
-#   - Saves features to Google Drive permanently
-#
-# After this finishes you never need to run it again.
-# Even if Colab disconnects your features are safe in Drive.
-# ════════════════════════════════════════════════════════════════
-
 # ── CELL 1: Install ──────────────────────────────────────────────
 # %%
 !pip install torch_geometric transformers --quiet
@@ -25,7 +13,6 @@ print("Drive mounted.")
 # %%
 import os
 
-# CHANGE: replace YourUsername with your GitHub username
 !git clone https://github.com/YourUsername/causal-fake-net.git
 
 os.chdir('/content/causal-fake-net/causal_fake_net')
@@ -36,7 +23,6 @@ print("Files:", os.listdir())
 # %%
 import os
 
-# CHANGE: update this if your Drive folder name is different
 PHEME_DRIVE = '/content/drive/MyDrive/FYP_data/pheme-rnr-dataset'
 PHEME_LOCAL = '/content/pheme'
 
