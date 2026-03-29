@@ -1,22 +1,3 @@
-# ════════════════════════════════════════════════════════════════
-# SESSION 2 — Run this notebook to train and get results
-#
-# Requirements:
-#   - Session 1 must have been completed first
-#   - Google Drive must have clip_cache folder with features
-#
-# What it does:
-#   - Loads cached features from Drive (instant — no waiting)
-#   - Trains CausalFakeNet
-#   - Saves trained model to Drive
-#   - Produces all results needed for FYP report
-#
-# If Colab disconnects during training:
-#   - Re-run Cells 1-4 to reconnect
-#   - Skip Cell 5 if model already saved to Drive
-#   - Go straight to Cell 6 for results
-# ════════════════════════════════════════════════════════════════
-
 # ── CELL 1: Install ──────────────────────────────────────────────
 # %%
 !pip install torch_geometric transformers scikit-learn \
@@ -30,7 +11,6 @@ drive.mount('/content/drive')
 
 import os
 
-# CHANGE: replace YourUsername with your GitHub username
 !git clone https://github.com/YourUsername/causal-fake-net.git
 
 os.chdir('/content/causal-fake-net/causal_fake_net')
@@ -48,7 +28,6 @@ from sklearn.metrics import (
 )
 import matplotlib.pyplot as plt
 
-# CHANGE: update if your Drive folder name is different
 PHEME_DRIVE = '/content/drive/MyDrive/FYP_data/pheme-rnr-dataset'
 
 EVENT_PATHS = {
