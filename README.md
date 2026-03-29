@@ -107,25 +107,3 @@ To use the Twitter / Weibo / Pheme datasets:
 | `lr` | 5e-4 | AdamW learning rate |
 
 ---
-
-## FYP writeup guidance
-
-When writing up:
-
-- **Section 3.1** Causal Event Graph Builder — explain why cause→effect edges
-  capture richer event semantics than subject-predicate alone. Cite Event-Radar's
-  own limitation statement: *"we have yet to explore event representation learning
-  from a causal relationship perspective."*
-
-- **Section 3.2** Edge Saliency & Rationale Generator — frame as interpretable AI
-  contribution. Compare to LIME/SHAP for graphs. No prior multimodal fake news
-  paper produces natural-language rationales from the graph structure.
-
-- **Section 4** Experiments — even on the synthetic dataset, show that:
-  - Removing causal edges (`w/o causal`) hurts F1
-  - Removing the rationale generator has no accuracy impact (ablation is clean)
-  - The edge saliency correctly highlights cause→effect edges for fake samples
-
----
-
-*Author: [Your name] | FYP | [University] | [Year]*
