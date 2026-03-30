@@ -32,23 +32,6 @@ causal_fake_net/
 ```
 
 ---
-
-## Quick start (Google Colab)
-
-```python
-# 1. Upload this folder to Colab or clone from GitHub
-
-# 2. Install dependencies
-!pip install torch torchvision torch_geometric scikit-learn matplotlib
-
-# 3. Run the demo
-%run colab_demo.py
-```
-
-Or step by step, open `colab_demo.py` — each `# %%` block is a Colab cell.
-
----
-
 ## Architecture overview
 
 ```
