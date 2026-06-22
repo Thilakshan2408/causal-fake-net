@@ -83,32 +83,29 @@ class CLIPExtractor:
             hidden = torch.cat([hidden, pad], dim=0)
         return F.normalize(hidden, dim=-1).cpu()
 
-    @torch.no_grad()
-    def extract_image(self, image) -> torch.Tensor:
-        n = self.num_img_patches
-        if image is None:
-            return torch.zeros(n, 512)
-        try:
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            inputs = self.processor(images=image, return_tensors="pt").to(self.device)
-            patches = self.model.vision_model(**inputs).last_hidden_state[0][1:]
-            if patches.size(0) >= n:
-                patches = patches[:n]
-            else:
-                # pad = torch.zeros(n - patches.size(0), 512, device=self.device)
+	@torch.no_grad()
+	def extract_image(self, image) -> torch.Tensor:
+		n = self.num_img_patches
+		if image is None:
+			return torch.zeros(n, 512)
+		try:
+			if image.mode != "RGB":
+				image = image.convert("RGB")
+			inputs  = self.processor(images=image, return_tensors="pt").to(self.device)
+			patches = self.model.vision_model(**inputs).last_hidden_state[0][1:]
+
+			if patches.size(0) >= n:
+				patches = patches[:n]
+			else:
 				pad = torch.zeros(n - patches.size(0), patches.size(-1), device=self.device)
-                patches = torch.cat([patches, pad], dim=0)
-			
-	    	if pathches.size(-1) == 768:
-			# Unsqueeze to add a temporary batch dimension for interpolate, then squeeze back
-                patches = F.interpolate(patches.unsqueeze(0), size=512, mode='linear', align_corners=False).squeeze(0)
+				patches = torch.cat([patches, pad], dim=0)
+			if patches.size(-1) == 768:
+				patches = F.interpolate(patches.unsqueeze(0), size=512, mode='linear', align_corners=False).squeeze(0)
 
-            return F.normalize(patches, dim=-1).cpu()
-        except Exception:
-            return torch.zeros(n, 512)
-
-
+			return F.normalize(patches, dim=-1).cpu()
+		except Exception:
+			return torch.zeros(n, 512)
+	
 class PhemeDataset(Dataset):
     """
     Loads Pheme dataset from a dict of event paths.
