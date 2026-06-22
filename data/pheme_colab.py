@@ -81,7 +81,7 @@ class CLIPExtractor:
             hidden = hidden[:n]
         else:
             # pad    = torch.zeros(n - hidden.size(0), 512, device=self.device)
-	    pad    = torch.zeros(n - hidden.size(0), hidden.size(-1), device=self.device)
+	    	pad    = torch.zeros(n - hidden.size(0), hidden.size(-1), device=self.device)
             hidden = torch.cat([hidden, pad], dim=0)
         return F.normalize(hidden, dim=-1).cpu()
 
@@ -99,11 +99,12 @@ class CLIPExtractor:
             if patches.size(0) >= n:
                 patches = patches[:n]
             else:
-                # pad     = torch.zeros(n - patches.size(0), 512, device=self.device)
-		pad     = torch.zeros(n - patches.size(0), patches.size(-1), device=self.device)
+                # pad = torch.zeros(n - patches.size(0), 512, device=self.device)
+				pad = torch.zeros(n - patches.size(0), patches.size(-1), device=self.device)
                 patches = torch.cat([patches, pad], dim=0)
-	    if pathches.size(-1) == 768:
-		# Unsqueeze to add a temporary batch dimension for interpolate, then squeeze back
+			
+	    	if pathches.size(-1) == 768:
+			# Unsqueeze to add a temporary batch dimension for interpolate, then squeeze back
                 patches = F.interpolate(patches.unsqueeze(0), size=512, mode='linear', align_corners=False).squeeze(0)
 
             return F.normalize(patches, dim=-1).cpu()
