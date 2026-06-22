@@ -72,16 +72,14 @@ class CLIPExtractor:
 
     @torch.no_grad()
     def extract_text(self, text: str) -> torch.Tensor:
-        inputs = self.processor(text=[text[:512]], return_tensors="pt", padding=True, truncation=True,
-            max_length=77,
-        ).to(self.device)
+        inputs = self.processor(text=[text[:512]], return_tensors="pt", padding=True, truncation=True,max_length=77).to(self.device)
         hidden = self.model.text_model(**inputs).last_hidden_state[0]
         n = self.num_text_tokens
         if hidden.size(0) >= n:
             hidden = hidden[:n]
         else:
-            # pad    = torch.zeros(n - hidden.size(0), 512, device=self.device)
-	    	pad    = torch.zeros(n - hidden.size(0), hidden.size(-1), device=self.device)
+            # pad = torch.zeros(n - hidden.size(0), 512, device=self.device)
+	    	pad = torch.zeros(n - hidden.size(0), hidden.size(-1), device=self.device)
             hidden = torch.cat([hidden, pad], dim=0)
         return F.normalize(hidden, dim=-1).cpu()
 
@@ -93,8 +91,7 @@ class CLIPExtractor:
         try:
             if image.mode != "RGB":
                 image = image.convert("RGB")
-            inputs  = self.processor(images=image, return_tensors="pt",
-            ).to(self.device)
+            inputs = self.processor(images=image, return_tensors="pt").to(self.device)
             patches = self.model.vision_model(**inputs).last_hidden_state[0][1:]
             if patches.size(0) >= n:
                 patches = patches[:n]
