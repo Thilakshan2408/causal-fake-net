@@ -78,9 +78,9 @@ class CLIPExtractor:
         if hidden.size(0) >= n:
             hidden = hidden[:n]
         else:
-            # pad = torch.zeros(n - hidden.size(0), 512, device=self.device)
-	    	pad = torch.zeros(n - hidden.size(0), hidden.size(-1), device=self.device)
-            hidden = torch.cat([hidden, pad], dim=0)
+            pad = torch.zeros(n - hidden.size(0), 512, device=self.device)
+			# pad = torch.zeros((n - hidden.size(0)),hidden.size(-1),device=self.device)
+			hidden = torch.cat([hidden, pad], dim=0)
         return F.normalize(hidden, dim=-1).cpu()
 
 	@torch.no_grad()
