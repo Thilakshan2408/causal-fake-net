@@ -1,11 +1,3 @@
-"""
-Pheme Dataset Loader for Colab
-================================
-Loads Pheme events from separate folders.
-Works with Google Drive cache so features
-are only extracted once.
-"""
-
 import os
 import json
 import random
@@ -63,12 +55,9 @@ def extract_srl_heuristic(text: str) -> dict:
 class CLIPExtractor:
     """
     Extracts CLIP features from text and images.
-    Downloads CLIP model automatically on first use.
     """
 
-    def __init__(self, device: str = "auto",
-                 num_text_tokens: int = 6,
-                 num_image_patches: int = 4):
+    def __init__(self, device: str = "auto", num_text_tokens: int = 6, num_image_patches: int = 4):
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device           = device
@@ -76,30 +65,23 @@ class CLIPExtractor:
         self.num_img_patches  = num_image_patches
 
         print(f"Loading CLIP on {device}...")
-        self.model = CLIPModel.from_pretrained(
-            "openai/clip-vit-base-patch16").to(device)
-        self.processor = CLIPProcessor.from_pretrained(
-            "openai/clip-vit-base-patch16")
+        self.model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16").to(device)
+        self.processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
         self.model.eval()
         print("CLIP loaded.")
 
     @torch.no_grad()
     def extract_text(self, text: str) -> torch.Tensor:
-        inputs = self.processor(
-            text=[text[:512]],
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
+        inputs = self.processor(text=[text[:512]], return_tensors="pt", padding=True, truncation=True,
             max_length=77,
         ).to(self.device)
-        hidden = self.model.text_model(
-            **inputs).last_hidden_state[0]
+        hidden = self.model.text_model(**inputs).last_hidden_state[0]
         n = self.num_text_tokens
         if hidden.size(0) >= n:
             hidden = hidden[:n]
         else:
-            pad    = torch.zeros(n - hidden.size(0), 512,
-                                 device=self.device)
+            # pad    = torch.zeros(n - hidden.size(0), 512, device=self.device)
+	    pad    = torch.zeros(n - hidden.size(0), hidden.size(-1), device=self.device)
             hidden = torch.cat([hidden, pad], dim=0)
         return F.normalize(hidden, dim=-1).cpu()
 
@@ -111,18 +93,19 @@ class CLIPExtractor:
         try:
             if image.mode != "RGB":
                 image = image.convert("RGB")
-            inputs  = self.processor(
-                images=image,
-                return_tensors="pt",
+            inputs  = self.processor(images=image, return_tensors="pt",
             ).to(self.device)
-            patches = self.model.vision_model(
-                **inputs).last_hidden_state[0][1:]
+            patches = self.model.vision_model(**inputs).last_hidden_state[0][1:]
             if patches.size(0) >= n:
                 patches = patches[:n]
             else:
-                pad     = torch.zeros(n - patches.size(0), 512,
-                                      device=self.device)
+                # pad     = torch.zeros(n - patches.size(0), 512, device=self.device)
+		pad     = torch.zeros(n - patches.size(0), patches.size(-1), device=self.device)
                 patches = torch.cat([patches, pad], dim=0)
+	    if pathches.size(-1) == 768:
+		# Unsqueeze to add a temporary batch dimension for interpolate, then squeeze back
+                patches = F.interpolate(patches.unsqueeze(0), size=512, mode='linear', align_corners=False).squeeze(0)
+
             return F.normalize(patches, dim=-1).cpu()
         except Exception:
             return torch.zeros(n, 512)
@@ -142,7 +125,7 @@ class PhemeDataset(Dataset):
         self,
         event_paths: dict,
         clip_extractor: CLIPExtractor,
-        split: str       = "train",
+        split: str         = "train",
         train_ratio: float = 0.7,
         val_ratio:   float = 0.15,
         seed: int          = 42,
@@ -180,8 +163,7 @@ class PhemeDataset(Dataset):
                 print(f"  Skipping missing: {event_name}")
                 continue
             print(f"  Loading: {event_name}")
-            for label_str, label_int in [("rumours",     1),
-                                          ("non-rumours", 0)]:
+            for label_str, label_int in [("rumours",     1), ("non-rumours", 0)]:
                 label_path = os.path.join(event_path, label_str)
                 if not os.path.exists(label_path):
                     continue
@@ -199,8 +181,7 @@ class PhemeDataset(Dataset):
                                 break
                     if not text:
                         continue
-                    image = self._load_image(
-                        os.path.join(thread_path, "images"))
+                    image = self._load_image(os.path.join(thread_path, "images"))
                     samples.append({
                         "text":      text,
                         "image":     image,
@@ -214,8 +195,7 @@ class PhemeDataset(Dataset):
         for fname in os.listdir(tweet_dir):
             if fname.endswith(".json"):
                 try:
-                    with open(os.path.join(tweet_dir, fname),
-                              "r", encoding="utf-8") as f:
+                    with open(os.path.join(tweet_dir, fname), "r", encoding="utf-8") as f:
                         data = json.load(f)
                     text = data.get("text", "")
                     if text:
@@ -228,12 +208,9 @@ class PhemeDataset(Dataset):
         if not os.path.exists(image_dir):
             return None
         for fname in os.listdir(image_dir):
-            if fname.lower().endswith(
-                    (".jpg", ".jpeg", ".png", ".gif")):
+            if fname.lower().endswith((".jpg", ".jpeg", ".png", ".gif")):
                 try:
-                    return Image.open(
-                        os.path.join(image_dir,
-                                     fname)).convert("RGB")
+                    return Image.open(os.path.join(image_dir, fname)).convert("RGB")
                 except Exception:
                     continue
         return None
