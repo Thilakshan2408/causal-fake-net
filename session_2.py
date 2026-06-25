@@ -1,24 +1,20 @@
 # ── CELL 1: Install ──────────────────────────────────────────────
-# %%
-!pip install torch_geometric transformers scikit-learn \
-             matplotlib --quiet
+!pip install torch_geometric transformers scikit-learn matplotlib --quiet
 print("Done.")
 
 # ── CELL 2: Mount Drive and clone project ────────────────────────
-# %%
 from google.colab import drive
 drive.mount('/content/drive')
 
 import os
 
-!git clone https://github.com/YourUsername/causal-fake-net.git
+!git clone https://github.com/Thilakshan2408/causal-fake-net.git
 
-os.chdir('/content/causal-fake-net/causal_fake_net')
+os.chdir('/content/causal-fake-net/')  # 'causal_fake_net' last part
 print("Working directory:", os.getcwd())
 print("Files:", os.listdir())
 
 # ── CELL 3: Setup ────────────────────────────────────────────────
-# %%
 import torch
 import torch.nn.functional as F
 from sklearn.metrics import (
@@ -37,7 +33,7 @@ EVENT_PATHS = {
 }
 
 CACHE_DIR  = '/content/drive/MyDrive/FYP_data/clip_cache'
-CKPT_PATH  = '/content/drive/MyDrive/FYP_data/best_causal.pt'
+CKPT_PATH  = '/content/drive/MyDrive/FYP_data/model.pt'
 
 device            = "cuda" if torch.cuda.is_available() else "cpu"
 FEAT_DIM          = 512
@@ -47,9 +43,8 @@ BATCH_SIZE        = 8
 MAX_EPOCHS        = 20
 PATIENCE          = 7
 
-# Check status
-cache_count   = len(os.listdir(CACHE_DIR)) \
-                if os.path.exists(CACHE_DIR) else 0
+# Check samples count and checkpoint path
+cache_count   = len(os.listdir(CACHE_DIR)) if os.path.exists(CACHE_DIR) else 0
 model_exists  = os.path.exists(CKPT_PATH)
 
 print(f"Device          : {device}")
@@ -61,8 +56,7 @@ if cache_count == 0:
     print("\nWARNING: No cached features found.")
     print("Please run session_1.ipynb first.")
 
-# ── CELL 4: Load dataset from cache (instant) ────────────────────
-# %%
+# ── CELL 4: Load dataset from cache (Drive) ────────────────────
 from torch.utils.data import DataLoader
 from data.pheme_colab import (
     CLIPExtractor, PhemeDataset,
@@ -76,22 +70,13 @@ clip_extractor = CLIPExtractor(
 )
 
 print("Loading dataset from Drive cache...")
-train_ds = PhemeDataset(EVENT_PATHS, clip_extractor,
-                        split="train", cache_dir=CACHE_DIR)
-val_ds   = PhemeDataset(EVENT_PATHS, clip_extractor,
-                        split="val",   cache_dir=CACHE_DIR)
-test_ds  = PhemeDataset(EVENT_PATHS, clip_extractor,
-                        split="test",  cache_dir=CACHE_DIR)
+train_ds = PhemeDataset(EVENT_PATHS, clip_extractor, split="train", cache_dir=CACHE_DIR)
+val_ds   = PhemeDataset(EVENT_PATHS, clip_extractor, split="val",   cache_dir=CACHE_DIR)
+test_ds  = PhemeDataset(EVENT_PATHS, clip_extractor, split="test",  cache_dir=CACHE_DIR)
 
-train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE,
-                          shuffle=True,
-                          collate_fn=collate_pheme)
-val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE,
-                          shuffle=False,
-                          collate_fn=collate_pheme)
-test_loader  = DataLoader(test_ds,  batch_size=BATCH_SIZE,
-                          shuffle=False,
-                          collate_fn=collate_pheme)
+train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_pheme)
+val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_pheme)
+test_loader  = DataLoader(test_ds,  batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_pheme)
 
 print(f"\nDataset loaded instantly from cache.")
 print(f"Train : {len(train_loader)} batches")
@@ -99,17 +84,14 @@ print(f"Val   : {len(val_loader)} batches")
 print(f"Test  : {len(test_loader)} batches")
 
 # ── CELL 5: Train CausalFakeNet ──────────────────────────────────
-# %%
-# Skip this cell if model already found in Drive (see Cell 3 output)
+# If not already trained
 
 from models.causal_fake_net import CausalFakeNet
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-model     = CausalFakeNet(feat_dim=FEAT_DIM,
-                          num_gcn_layers=1).to(device)
-optimizer = AdamW(model.parameters(),
-                  lr=1e-3, weight_decay=1e-4)
+model     = CausalFakeNet(feat_dim=FEAT_DIM, num_gcn_layers=1).to(device)
+optimizer = AdamW(model.parameters(), lr=2e-4, weight_decay=5e-3)
 scheduler = CosineAnnealingLR(optimizer, T_max=MAX_EPOCHS)
 
 history    = {"train_loss": [], "val_acc": [], "val_f1": []}
@@ -119,6 +101,18 @@ no_improve = 0
 print(f"Parameters : {sum(p.numel() for p in model.parameters()):,}")
 print(f"Device     : {device}")
 print(f"Max epochs : {MAX_EPOCHS}")
+
+# Create the specific subdirectories inside base CKPT_PATH directory
+best_dir = os.path.join(WORKING_DIR, "best")
+last_dir = os.path.join(WORKING_DIR, "last")
+
+os.makedirs(best_dir, exist_ok=True)
+os.makedirs(last_dir, exist_ok=True)
+
+# Define the full file paths for both checkpoints
+BEST_CKPT_FILE = os.path.join(best_dir, "model.pt")
+LAST_CKPT_FILE = os.path.join(last_dir, "model.pt")
+
 print("\nTraining...\n")
 
 for epoch in range(1, MAX_EPOCHS + 1):
@@ -134,8 +128,7 @@ for epoch in range(1, MAX_EPOCHS + 1):
         logits, cred, ew, fused = model(tf, vf, srl)
         loss = F.cross_entropy(logits, y)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(
-            model.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
         epoch_loss += loss.item()
     scheduler.step()
@@ -153,8 +146,7 @@ for epoch in range(1, MAX_EPOCHS + 1):
             vl.extend(batch["labels"].tolist())
 
     val_acc  = accuracy_score(vl, vp)
-    val_f1   = f1_score(vl, vp, average="binary",
-                        zero_division=0)
+    val_f1   = f1_score(vl, vp, average="binary", zero_division=0)
     avg_loss = epoch_loss / len(train_loader)
 
     history["train_loss"].append(avg_loss)
@@ -166,6 +158,8 @@ for epoch in range(1, MAX_EPOCHS + 1):
           f"val_acc={val_acc:.4f}  "
           f"val_f1={val_f1:.4f}")
 
+    # --- CHECKPOINT SAVING LOGIC ---
+    # Save the absolute BEST model based on val_f1
     if val_f1 > best_f1:
         best_f1    = val_f1
         no_improve = 0
@@ -174,25 +168,29 @@ for epoch in range(1, MAX_EPOCHS + 1):
              "val_f1":      val_f1,
              "epoch":       epoch,
              "history":     history},
-            CKPT_PATH)
-        print(f"  ✓ Saved to Drive (val_f1={val_f1:.4f})")
+            BEST_CKPT_FILE)  # <--- Changed to save in 'best' folder
+        print(f"  ✓ Saved to Drive/best (val_f1={val_f1:.4f})")
     else:
         no_improve += 1
-        if no_improve >= PATIENCE:
-            print(f"\nEarly stopping at epoch {epoch}")
-            break
+
+    # Save the LAST model explicitly if it reaches the final epoch
+    if epoch == MAX_EPOCHS:
+        torch.save(
+            {"model_state": model.state_dict(),
+             "val_f1":      val_f1,
+             "epoch":       epoch,
+             "history":     history},
+            LAST_CKPT_FILE)  # <--- Changed to save in 'last' folder
+        print(f"  💾 Final 30th epoch model saved to Drive/last")
 
 print("\nTraining complete. Model saved to Drive.")
 
 # ── CELL 6: Load model and test evaluation ───────────────────────
-# %%
-# This cell works even after reconnect —
 # loads model directly from Drive
 
 from models.causal_fake_net import CausalFakeNet
 
-model = CausalFakeNet(feat_dim=FEAT_DIM,
-                      num_gcn_layers=1).to(device)
+model = CausalFakeNet(feat_dim=FEAT_DIM, num_gcn_layers=1).to(device)
 ckpt  = torch.load(CKPT_PATH, map_location=device)
 model.load_state_dict(ckpt["model_state"])
 model.eval()
@@ -216,12 +214,9 @@ with torch.no_grad():
         all_labels.extend(batch["labels"].tolist())
 
 acc  = accuracy_score(all_labels, all_preds)
-f1   = f1_score(all_labels, all_preds,
-                average="binary", zero_division=0)
-prec = precision_score(all_labels, all_preds,
-                       average="binary", zero_division=0)
-rec  = recall_score(all_labels, all_preds,
-                    average="binary", zero_division=0)
+f1   = f1_score(all_labels, all_preds, average="binary", zero_division=0)
+prec = precision_score(all_labels, all_preds, average="binary", zero_division=0)
+rec  = recall_score(all_labels, all_preds, average="binary", zero_division=0)
 
 print("\n" + "=" * 50)
 print("CausalFakeNet — Pheme Test Results")
@@ -236,8 +231,7 @@ print("Screenshot this for your FYP report.")
 # ── CELL 7: Confusion matrix ─────────────────────────────────────
 # %%
 cm   = confusion_matrix(all_labels, all_preds)
-disp = ConfusionMatrixDisplay(
-    cm, display_labels=["Real", "Fake"])
+disp = ConfusionMatrixDisplay(cm, display_labels=["Real", "Fake"])
 fig, ax = plt.subplots(figsize=(5, 4))
 disp.plot(ax=ax, cmap="Blues", colorbar=False)
 ax.set_title("CausalFakeNet — Pheme test set")
@@ -274,7 +268,6 @@ plt.show()
 print("Saved to Drive: training_curves.png")
 
 # ── CELL 9: Baseline comparison ──────────────────────────────────
-# %%
 import torch.nn as nn
 
 class CLIPWithMLP(nn.Module):
