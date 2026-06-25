@@ -22,16 +22,11 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from torch_geometric.data import Data
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. CAUSAL EVENT GRAPH BUILDER
-# ─────────────────────────────────────────────────────────────────────────────
-
 class CausalGraphBuilder(nn.Module):
     """
     Builds a causal event graph from CLIP text/image features + SRL annotations.
 
-    Nodes  : entities extracted by NER (subject, object, location, cause, effect)
+    Nodes  : entities (subject, object, location, cause, effect)
     Edges  : typed relations
               - subject→predicate   (standard, inherited from Event-Radar)
               - cause→effect        (NOVEL: causal link)
@@ -165,8 +160,8 @@ class CausalGraphBuilder(nn.Module):
         add_edge(role_to_node["subject"],   role_to_node["predicate"], "subject_predicate")
         add_edge(role_to_node["predicate"], role_to_node["object"],    "subject_predicate")
 
-        # ── NOVEL: cause→effect causal edges ──
-        if "cause" in roles or True:   # always try to add
+        # NOVEL: cause→effect causal edges
+        if "cause" in roles or True:
             add_edge(role_to_node["cause"],  role_to_node["effect"],    "cause_effect")
             add_edge(role_to_node["cause"],  role_to_node["predicate"], "cause_effect")
 
@@ -176,11 +171,6 @@ class CausalGraphBuilder(nn.Module):
             add_edge(role_to_node[f"img_{role}"], role_to_node[role], "cross_modal")
 
         return nodes, node_types, edges, [e[1] for e in edges]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. CAUSAL GCN WITH EDGE SALIENCY
-# ─────────────────────────────────────────────────────────────────────────────
 
 class CausalGCN(nn.Module):
     """
@@ -231,11 +221,6 @@ class CausalGCN(nn.Module):
             return edge_weight.grad.abs()
         return torch.zeros_like(edge_weight)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. BETA CREDIBILITY MODULE  (from Event-Radar, adapted for causal view)
-# ─────────────────────────────────────────────────────────────────────────────
-
 class BetaCredibility(nn.Module):
     """
     Estimates per-view credibility using Beta distribution parameterisation
@@ -267,11 +252,6 @@ class BetaCredibility(nn.Module):
         credibility = 1.0 - uncertainty          # (B,)
         return logits, credibility
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. EMOTION ENCODER  (lightweight, following Event-Radar §3.2)
-# ─────────────────────────────────────────────────────────────────────────────
-
 class EmotionEncoder(nn.Module):
     def __init__(self, feat_dim: int):
         super().__init__()
@@ -284,11 +264,6 @@ class EmotionEncoder(nn.Module):
     def forward(self, text_cls: torch.Tensor) -> torch.Tensor:
         """text_cls: (B, d) — CLS token from CLIP text encoder."""
         return self.proj(text_cls)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. PATTERN ENCODER  (DCT-based, following Event-Radar §3.2)
-# ─────────────────────────────────────────────────────────────────────────────
 
 class PatternEncoder(nn.Module):
     """
@@ -312,11 +287,6 @@ class PatternEncoder(nn.Module):
         attended, _ = self.attn(freq, freq, freq)        # (B, n, d)
         pooled = attended.mean(dim=1)                    # (B, d)
         return self.out_proj(pooled)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 6. MULTI-VIEW FUSION  (credibility-weighted MHSA)
-# ─────────────────────────────────────────────────────────────────────────────
 
 class MultiViewFusion(nn.Module):
     def __init__(self, feat_dim: int, num_heads: int = 4):
@@ -343,11 +313,6 @@ class MultiViewFusion(nn.Module):
         fused, attn_weights = self.attn(views, views, views)  # (B, 3, d)
         fused = self.norm(fused.mean(dim=1))                  # (B, d)
         return fused, attn_weights
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 7. RATIONALE GENERATOR  (NOVEL — template + saliency)
-# ─────────────────────────────────────────────────────────────────────────────
 
 class RationaleGenerator:
     """
@@ -416,11 +381,6 @@ class RationaleGenerator:
         template_key = f"fake_{weakest}"
         return self.TEMPLATES[template_key].format(**kw)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 8. FULL MODEL
-# ─────────────────────────────────────────────────────────────────────────────
-
 class CausalFakeNet(nn.Module):
     """
     CausalFakeNet — complete fake news detection model.
@@ -442,8 +402,7 @@ class CausalFakeNet(nn.Module):
         self.graph_builder  = CausalGraphBuilder(feat_dim)
         self.causal_gcn     = CausalGCN(feat_dim, num_gcn_layers, alpha)
 
-        # Comparison function projection (from Event-Radar §3.1)
-        # x_c = W_c [h_P, h_I, h_P-h_I, h_P⊙h_I]
+        # Comparison function projection (from Event-Radar 3.1)
         self.compare_proj = nn.Linear(feat_dim * 4, feat_dim)
 
         # Stage 2: other view encoders
@@ -477,7 +436,7 @@ class CausalFakeNet(nn.Module):
     ):
         B = text_feats.size(0)
 
-        # ── 1. Build and encode causal graphs ──
+        # 1. Build and encode causal graphs
         graphs = self.graph_builder(text_feats, image_feats, srl_roles)
 
         x_c_list, edge_weight_list = [], []
@@ -496,19 +455,19 @@ class CausalFakeNet(nn.Module):
 
         x_c = torch.stack(x_c_list, dim=0)           # (B, d)
 
-        # ── 2. Other views ──
+        # 2. Other views
         text_cls    = text_feats[:, 0, :]             # (B, d)  CLS token
         x_e = self.emotion_enc(text_cls)              # (B, d)
         x_p = self.pattern_enc(image_feats)           # (B, d)
 
-        # ── 3. Credibility estimation ──
+        # 3. Credibility estimation
         logits_c, q_c = self.cred_c(x_c)
         logits_e, q_e = self.cred_e(x_e)
         logits_p, q_p = self.cred_p(x_p)
 
         credibility = torch.stack([q_c, q_e, q_p], dim=-1)   # (B, 3)
 
-        # ── 4. Fusion & classification ──
+        # 4. Fusion & classification
         fused, _ = self.fusion(x_c, x_e, x_p, q_c, q_e, q_p)
         logits = self.classifier(fused)                        # (B, 2)
 
