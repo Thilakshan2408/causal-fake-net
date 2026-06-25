@@ -1,26 +1,22 @@
 # ── CELL 1: Install ──────────────────────────────────────────────
-# %%
 !pip install torch_geometric transformers --quiet
 print("Done.")
 
 # ── CELL 2: Mount Drive ──────────────────────────────────────────
-# %%
 from google.colab import drive
 drive.mount('/content/drive')
 print("Drive mounted.")
 
 # ── CELL 3: Clone project from GitHub ───────────────────────────
-# %%
 import os
 
-!git clone https://github.com/YourUsername/causal-fake-net.git
+!git clone https://github.com/Thilakshan2408/causal-fake-net.git
 
-os.chdir('/content/causal-fake-net/causal_fake_net')
+os.chdir('/content/causal-fake-net/')
 print("Working directory:", os.getcwd())
 print("Files:", os.listdir())
 
 # ── CELL 4: Copy Pheme from Drive to local storage ───────────────
-# %%
 import os
 
 PHEME_DRIVE = '/content/drive/MyDrive/FYP_data/pheme-rnr-dataset'
@@ -33,7 +29,6 @@ print("Done.")
 print("Contents:", os.listdir(PHEME_LOCAL))
 
 # ── CELL 5: Setup ────────────────────────────────────────────────
-# %%
 import torch
 import torch.nn.functional as F
 
@@ -59,7 +54,6 @@ for name, path in EVENT_PATHS.items():
     print(f"  {name:<22} exists={os.path.exists(path)}")
 
 # ── CELL 6: Extract and save all CLIP features to Drive ──────────
-# %%
 import json, random
 from PIL import Image
 from torch.utils.data import Dataset
