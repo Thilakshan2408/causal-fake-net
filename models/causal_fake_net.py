@@ -1,5 +1,5 @@
 """
-CausalFakeNet — FYP Prototype
+CausalFakeNet
 ==============================
 Novel contributions vs Event-Radar (ACL 2024):
   1. Causal event graph  : cause→effect edges (not just subject-predicate)
