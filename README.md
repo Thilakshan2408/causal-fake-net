@@ -1,4 +1,4 @@
-# CausalFakeNet/EventX-FND — FYP Prototype
+# CausalFakeNet — FYP
 
 **Event-driven multimodal fake news detection with causal graphs and explainability.**
 
@@ -26,7 +26,6 @@ causal_fake_net/
 │   └── losses.py            ← all loss functions
 ├── data/
 │   └── dataset.py           ← synthetic dataset + dataloader
-├── train.py                 ← training loop
 ├── colab_demo.py            ← full Colab walkthrough
 └── requirements.txt
 ```
