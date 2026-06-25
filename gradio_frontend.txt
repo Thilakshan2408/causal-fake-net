@@ -1,0 +1,159 @@
+import gradio as gr
+from PIL import Image
+import numpy as np
+import torch
+from models.causal_fake_net import CausalFakeNet
+from data.pheme_colab import (CLIPExtractor, extract_srl_heuristic)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+clip = CLIPExtractor(
+    device=device,
+    num_text_tokens=6,
+    num_image_patches=4,
+)
+
+model = CausalFakeNet(feat_dim=512, num_gcn_layers=1).to(device)
+checkpoint = torch.load('/content/drive/MyDrive/FYP_data/model1.pt', map_location=device)
+model.load_state_dict(checkpoint["model_state"])
+model.eval()
+
+def analyse_news(news_text, news_image):
+    if not news_text or news_text.strip() == "":
+        return "⚠️ Please enter news text.", "No text provided to evaluate."
+
+    pil_image = None
+    if news_image is not None:
+        if isinstance(news_image, np.ndarray):
+            pil_image = Image.fromarray(news_image.astype("uint8"))
+            print("pil_image from TRUE block", pil_image)
+        else:
+            pil_image = news_image
+            print("pil_image from FALSE block", pil_image)
+
+    text_feats  = clip.extract_text(news_text)
+    image_feats = clip.extract_image(pil_image)
+
+    tf  = text_feats.unsqueeze(0).to(device)
+    vf  = image_feats.unsqueeze(0).to(device)
+    srl = [extract_srl_heuristic(news_text)]
+
+    with torch.no_grad():
+        explanations = model.explain(tf, vf, srl)
+
+    explanation = explanations[0]
+
+    if "FAKE" in explanation:
+        label = "🔴 FAKE NEWS DETECTED"
+    else:
+        label = "🟢 REAL NEWS"
+
+    return label, explanation
+
+
+custom_css = """
+
+.gradio-container {
+    background-color: #030712 !important;
+}
+
+
+textarea, .gradio-image, .output-box, .image-container {
+    background-color: #111827 !important;
+    border: 1px solid #374151 !important;
+    color: #f9fafb !important;
+    border-radius: 8px !important;
+}
+
+
+.form .block label span, .fieldset label span {
+    background-color: #1e293b !important;
+    color: #38bdf8 !important;
+    border: 1px solid #475569 !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+
+.submit-btn {
+    background: linear-gradient(90deg, #0284c7 0%, #0369a1 100%) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border: 1px solid #0ea5e9 !important;
+    border-radius: 6px !important;
+}
+.submit-btn:hover {
+    background: linear-gradient(90deg, #0369a1 0%, #075985 100%) !important;
+}
+
+
+.secondary-btn {
+    background-color: #1f2937 !important;
+    color: #d1d5db !important;
+    border: 1px solid #4b5563 !important;
+}
+.secondary-btn:hover {
+    background-color: #374151 !important;
+}
+"""
+
+
+with gr.Blocks(theme=gr.themes.Soft(primary_hue="sky", secondary_hue="slate"), css=custom_css) as demo:
+
+    # Header Section (Optimized with vivid neon and pure white contrast elements)
+    with gr.Group(elem_id="title-container"):
+        gr.Markdown("# <center>🔍 <span style='color: #38bdf8;'>CausalFakeNet</span></center>")
+        gr.Markdown("### <center><span style='color: #f9fafb;'>Explainable Multimodal Fake News Detection System</span></center>")
+        gr.Markdown("<center><p style='color: #9ca3af; font-size: 1.05rem;'>Analyse the causal consistency between text and image using a cross-modal event graph framework.</p></center>")
+
+    # Main Workspace Split
+    with gr.Row():
+        # Left Column: Inputs
+        with gr.Column(scale=1):
+            gr.Markdown("### <span style='color: #f3f4f6;'>📥 Input Verification Data</span>")
+            news_text = gr.Textbox(
+                label="News Post Text",
+                placeholder="Paste the claim or social media post text here...",
+                lines=5,
+                max_lines=8
+            )
+            news_image = gr.Image(
+                label="Associated News Image (Optional)",
+                type="numpy"
+            )
+
+            with gr.Row():
+                clear_btn = gr.Button("Reset", variant="secondary", elem_classes="secondary-btn")
+                submit_btn = gr.Button("Analyse", variant="primary", elem_classes="submit-btn")
+
+        # Right Column: UI Outputs
+        with gr.Column(scale=1):
+            gr.Markdown("### <span style='color: #f3f4f6;'>📊 Model Inference Results</span>")
+            label_output = gr.Textbox(
+                label="Verdict Classification",
+                interactive=False,
+                elem_classes="output-box"
+            )
+            explanation_output = gr.Textbox(
+                label="System Explanation & Causal Attribution Scores",
+                lines=9,
+                interactive=False,
+                elem_classes="output-box"
+            )
+
+    # Event Handlers mapping
+    submit_btn.click(
+        fn=analyse_news,
+        inputs=[news_text, news_image],
+        outputs=[label_output, explanation_output]
+    )
+    clear_btn.click(
+        lambda: (None, None, None, None),
+        inputs=None,
+        outputs=[news_text, news_image, label_output, explanation_output]
+    )
+
+# Launch system
+if __name__ == "__main__":
+    demo.launch(share=True)
